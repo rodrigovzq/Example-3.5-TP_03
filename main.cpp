@@ -1,3 +1,17 @@
+/*!****************************************************************************
+ * @file main.cpp
+ * @brief Activate the alarm when gas or overTemperature is detected
+ * This program was built and tested on the NUCLEO F429ZI ARMC6,
+ * connected to a series of push buttons, temperature sensor, trimpot and an buzzer.
+ *  It takes care of turning on and off 
+ * the LED1 based on the selected state of the dip switch. Additionally,
+ * it prints in the terminal the states of the pins
+ * The pins is set into a PullDown mode so the dip switch should be connected 
+ * to 3.3V pin
+ * There is an OFF combination of buttons to set the alarm state to OFF and so its pin LED
+ * @author Quattrone Martin
+ * @author Vazquez Rodrigo
+ *******************************************************************************/
 //=====[Libraries]=============================================================
 
 #include "mbed.h"
@@ -17,21 +31,23 @@
 
 DigitalIn enterButton(BUTTON1);
 DigitalIn alarmTestButton(D2);
-DigitalIn aButton(D4);
-DigitalIn bButton(D5);
-DigitalIn cButton(D6);
-DigitalIn dButton(D7);
+// DigitalIn aButton(D4);
+// DigitalIn bButton(D5);
+// DigitalIn cButton(D6);
+// DigitalIn dButton(D7);
+BusIn keypad(D4,D5,D6,D7);
 DigitalIn mq2(PE_12);
 
 DigitalOut alarmLed(LED1);
 DigitalOut incorrectCodeLed(LED3);
 DigitalOut systemBlockedLed(LED2);
+BusOut statusLEDs (LED1, LED3, LED2);
 
 DigitalInOut sirenPin(PE_10);
 
 UnbufferedSerial uartUsb(USBTX, USBRX, 115200);
 
-AnalogIn potentiometer(A0);
+AnalogIn potentiometer(A0); // objeto potentiometer de la clase AnalogIn, el constructor esta adentro
 AnalogIn lm35(A1);
 
 //=====[Declaration and initialization of public global variables]=============
@@ -88,19 +104,19 @@ int main()
 void inputsInit()
 {
     alarmTestButton.mode(PullDown);
-    aButton.mode(PullDown);
-    bButton.mode(PullDown);
-    cButton.mode(PullDown);
-    dButton.mode(PullDown);
+    // aButton.mode(PullDown);
+    // bButton.mode(PullDown);
+    // cButton.mode(PullDown);
+    // dButton.mode(PullDown);
+    keypad.mode(PullDown);
     sirenPin.mode(OpenDrain);
     sirenPin.input();
 }
 
 void outputsInit()
 {
-    alarmLed = OFF;
-    incorrectCodeLed = OFF;
-    systemBlockedLed = OFF;
+    statusLEDs = OFF;
+    printf("LEDs are OFF  \n\r");
 }
 
 void alarmActivationUpdate()
@@ -109,6 +125,7 @@ void alarmActivationUpdate()
     int i = 0;
 
     lm35ReadingsArray[lm35SampleIndex] = lm35.read();
+    printf("Temperature reading is %.2f  \n\r",lm35.read());
     lm35SampleIndex++;
     if ( lm35SampleIndex >= NUMBER_OF_AVG_SAMPLES) {
         lm35SampleIndex = 0;
@@ -143,7 +160,8 @@ void alarmActivationUpdate()
     if( alarmState ) { 
         accumulatedTimeAlarm = accumulatedTimeAlarm + TIME_INCREMENT_MS;
         sirenPin.output();                                     
-        sirenPin = LOW;                                        
+        sirenPin = LOW;   
+        printf("Siren is OFF  \n\r");                                     
     
         if( gasDetectorState && overTempDetectorState ) {
             if( accumulatedTimeAlarm >= BLINKING_TIME_GAS_AND_OVER_TEMP_ALARM ) {
@@ -162,24 +180,24 @@ void alarmActivationUpdate()
             }
         }
     } else{
-        alarmLed = OFF;
+        alarmLed = OFF; printf("Alarm LED is OFF  \n\r");
         gasDetectorState = OFF;
         overTempDetectorState = OFF;
-        sirenPin.input();                                  
+        sirenPin.input();                         
     }
 }
 
 void alarmDeactivationUpdate()
 {
     if ( numberOfIncorrectCodes < 5 ) {
-        if ( aButton && bButton && cButton && dButton && !enterButton ) {
+        if ( keypad & keypad.mask()  && !enterButton ) {
             incorrectCodeLed = OFF;
         }
         if ( enterButton && !incorrectCodeLed && alarmState ) {
-            buttonsPressed[0] = aButton;
-            buttonsPressed[1] = bButton;
-            buttonsPressed[2] = cButton;
-            buttonsPressed[3] = dButton;
+            buttonsPressed[0] = keypad & 0x8; //0b1000
+            buttonsPressed[1] = keypad & 0x4; //0b0100
+            buttonsPressed[2] = keypad & 0x2; //0b0010
+            buttonsPressed[3] = keypad & 0x1; //0b0001
             if ( areEqual() ) {
                 alarmState = OFF;
                 numberOfIncorrectCodes = 0;
@@ -300,7 +318,7 @@ void uartTask()
  
         case 'p':
         case 'P':
-            potentiometerReading = potentiometer.read();
+            potentiometerReading = potentiometer.read(); //metodo
             sprintf ( str, "Potentiometer: %.2f\r\n", potentiometerReading );
             stringLength = strlen(str);
             uartUsb.write( str, stringLength );
