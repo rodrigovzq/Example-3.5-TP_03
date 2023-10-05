@@ -1,17 +1,3 @@
-/*!****************************************************************************
- * @file main.cpp
- * @brief Activate the alarm when gas or overTemperature is detected
- * This program was built and tested on the NUCLEO F429ZI ARMC6,
- * connected to a series of push buttons, temperature sensor, trimpot and an buzzer.
- *  It takes care of turning on and off 
- * the LED1 based on the selected state of the dip switch. Additionally,
- * it prints in the terminal the states of the pins
- * The pins is set into a PullDown mode so the dip switch should be connected 
- * to 3.3V pin
- * There is an OFF combination of buttons to set the alarm state to OFF and so its pin LED
- * @author Quattrone Martin
- * @author Vazquez Rodrigo
- *******************************************************************************/
 //=====[Libraries]=============================================================
 
 #include "mbed.h"
@@ -41,13 +27,12 @@ DigitalIn mq2(PE_12);
 DigitalOut alarmLed(LED1);
 DigitalOut incorrectCodeLed(LED3);
 DigitalOut systemBlockedLed(LED2);
-BusOut statusLEDs (LED1, LED3, LED2);
 
 DigitalInOut sirenPin(PE_10);
 
 UnbufferedSerial uartUsb(USBTX, USBRX, 115200);
 
-AnalogIn potentiometer(A0); // objeto potentiometer de la clase AnalogIn, el constructor esta adentro
+AnalogIn potentiometer(A0);
 AnalogIn lm35(A1);
 
 //=====[Declaration and initialization of public global variables]=============
@@ -108,15 +93,19 @@ void inputsInit()
     // bButton.mode(PullDown);
     // cButton.mode(PullDown);
     // dButton.mode(PullDown);
-    keypad.mode(PullDown);
+
+    // Configuración del bus de entrada (keypad)
+    // Dejamos de declara las entradas una por una para pasara a declararlas como BUS todas juntas
+    keypad.mode(PullDown); // Configura todos los pines del bus como PullDown
     sirenPin.mode(OpenDrain);
     sirenPin.input();
 }
 
 void outputsInit()
 {
-    statusLEDs = OFF;
-    printf("LEDs are OFF  \n\r");
+    alarmLed = OFF;
+    incorrectCodeLed = OFF;
+    systemBlockedLed = OFF;
 }
 
 void alarmActivationUpdate()
@@ -125,7 +114,6 @@ void alarmActivationUpdate()
     int i = 0;
 
     lm35ReadingsArray[lm35SampleIndex] = lm35.read();
-    printf("Temperature reading is %.2f  \n\r",lm35.read());
     lm35SampleIndex++;
     if ( lm35SampleIndex >= NUMBER_OF_AVG_SAMPLES) {
         lm35SampleIndex = 0;
@@ -160,8 +148,7 @@ void alarmActivationUpdate()
     if( alarmState ) { 
         accumulatedTimeAlarm = accumulatedTimeAlarm + TIME_INCREMENT_MS;
         sirenPin.output();                                     
-        sirenPin = LOW;   
-        printf("Siren is OFF  \n\r");                                     
+        sirenPin = LOW;                                        
     
         if( gasDetectorState && overTempDetectorState ) {
             if( accumulatedTimeAlarm >= BLINKING_TIME_GAS_AND_OVER_TEMP_ALARM ) {
@@ -180,10 +167,10 @@ void alarmActivationUpdate()
             }
         }
     } else{
-        alarmLed = OFF; printf("Alarm LED is OFF  \n\r");
+        alarmLed = OFF;
         gasDetectorState = OFF;
         overTempDetectorState = OFF;
-        sirenPin.input();                         
+        sirenPin.input();                                  
     }
 }
 
@@ -194,6 +181,7 @@ void alarmDeactivationUpdate()
             incorrectCodeLed = OFF;
         }
         if ( enterButton && !incorrectCodeLed && alarmState ) {
+            // Lee el estado de los botones del bus keypad usando máscaras
             buttonsPressed[0] = keypad & 0x8; //0b1000
             buttonsPressed[1] = keypad & 0x4; //0b0100
             buttonsPressed[2] = keypad & 0x2; //0b0010
@@ -318,7 +306,7 @@ void uartTask()
  
         case 'p':
         case 'P':
-            potentiometerReading = potentiometer.read(); //metodo
+            potentiometerReading = potentiometer.read();
             sprintf ( str, "Potentiometer: %.2f\r\n", potentiometerReading );
             stringLength = strlen(str);
             uartUsb.write( str, stringLength );
