@@ -182,10 +182,11 @@ void alarmDeactivationUpdate()
         }
         if ( enterButton && !incorrectCodeLed && alarmState ) {
             // Lee el estado de los botones del bus keypad usando máscaras
-            buttonsPressed[0] = keypad & 0x8; //0b1000
-            buttonsPressed[1] = keypad & 0x4; //0b0100
-            buttonsPressed[2] = keypad & 0x2; //0b0010
-            buttonsPressed[3] = keypad & 0x1; //0b0001
+            buttonsPressed[0] = keypad[0];  // Lee el estado del primer botón en D4
+            buttonsPressed[1] = keypad[1];  // Lee el estado del segundo botón en D5
+            buttonsPressed[2] = keypad[2];  // Lee el estado del tercer botón en D6
+            buttonsPressed[3] = keypad[3];  // Lee el estado del cuarto botón en D7
+
             if ( areEqual() ) {
                 alarmState = OFF;
                 numberOfIncorrectCodes = 0;
